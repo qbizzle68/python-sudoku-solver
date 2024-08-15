@@ -1,6 +1,6 @@
 import unittest
 
-from components import Cell
+from cell import Cell
 from exceptions import CellValueContradiction, CellValueNotPossible
 
 
