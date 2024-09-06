@@ -118,6 +118,10 @@ class Move:
     def actions(self):
         return self._actions
 
+    @property
+    def message(self) -> str:
+        return self._msg
+
     def join(self, *args) -> 'Move':
         """Join one or more iterables of actions to this Move. This action returns a new
         Move object, but it will resemble this Move, only differing in the additional

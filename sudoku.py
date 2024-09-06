@@ -65,15 +65,25 @@ class SudokuSolver:
 
         return self._board.toString(0)
 
-    def solve(self):
+    def solve(self, details: bool = False) -> bool:
         """Solve the puzzle by finding each step and executing the necessary moves until
-        the puzzle is fully solved."""
+        the puzzle is fully solved. If details is True the message property of each Move
+        object is printed before executing said Move. Returns the value of
+        validateBoard(self.board)."""
 
         for move in self:
             if move:
+                if details:
+                    print(move.message)
                 self._executeMove(move)
             else:
                 raise NoMovesFound('No more moves found in this puzzle.')
+
+        # adds a blank line between details and finished puzzle
+        if details:
+            print('\n', end='')
+
+        return validateBoard(self._board)
 
     def findCurrentMoves(self) -> list[Move]:
         """Return a list of all possible moves with the board's current state. If no moves are
@@ -431,10 +441,21 @@ def main():
     if not os.path.exists:
         raise FileExistsError(f'file path {filename} does not exist')
 
+    # this will be handled by argparse in the future
+    if len(sys.argv) > 2:
+        detailsArg = sys.argv[2]
+        if detailsArg == '--details' or detailsArg == '-d':
+            details = True
+        else:
+            print('Unknown argument', detailsArg)
+            return 1
+    else:
+        details = False
+
     solver = SudokuSolver(filename)
 
     try:
-        solver.solve()
+        solver.solve(details=details)
     except NoMovesFound:
         print(solver)
         print('No more moves found.')
