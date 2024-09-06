@@ -1,3 +1,4 @@
+import itertools
 from typing import Iterable
 
 from cell import Coordinate, Cell
@@ -287,6 +288,13 @@ class Board:
         return string.replace('0', ' ')
 
     def _getStringLine(self, row: int, line: int) -> str:
+        """Generate a line of the detailed output string. Row is the row of the puzzle we
+        are creating the string for and line is the line in that row. Each row has three,
+        lines: the first display the candidates for 1, 2, and 3; the second display the
+        candidates for 4, 5, 6, and the third display the candidates for 7, 8, 9. If the
+        cell is filled, each candidate slot will contain the cell value to make it obvious
+        the cell is filled."""
+
         offset = (line - 1) * 3
         string = ''
         for i, cell in enumerate(self._rows[row], 1):
@@ -302,6 +310,9 @@ class Board:
         return string
 
     def _getStringRow(self, row: int) -> str:
+        """Get the three candidate lines for a single row in creating the detailed
+        string of the board."""
+
         string = ''
         for i, line in enumerate(range(1, 4), 1):
             string += self._getStringLine(row, line)
@@ -310,6 +321,11 @@ class Board:
         return string
 
     def __str__(self) -> str:
+        """Create a detailed string representation of the current board state. Each
+        cell contains the possible candidates of that cell unless the cell is already
+        filled, in which case every candidate slot will be filled with the cell value
+        to ensure it is obvious that cell is filled at first glance."""
+
         string = ''
         for rowNumber in range(1, 10):
             string += self._getStringRow(rowNumber)
@@ -323,6 +339,8 @@ class Board:
         return string[:-1]
 
     def __repr__(self) -> str:
+        """Create a .sdm formatted string of the current state of the board."""
+
         numbers = (str(cell.value) for cell in self._cells.squash())
         return ''.join(numbers)
 
@@ -371,8 +389,8 @@ class Board:
 
     @staticmethod
     def removeCandidateValues(cells: GenericIterable[Cell], value: int, key: callable) -> list[Action]:
-        """Builds a Move object from all actions needed to remove the candidate value from every
-        cell in cells where key(cell, value) is True."""
+        """Builds a Move object from all actions needed to remove the candidate value from
+        every cell in cells where key(cell, value) is True."""
 
         actions = []
         for cell in cells:
@@ -381,3 +399,59 @@ class Board:
                 actions.append(action)
 
         return actions
+
+    def convertToStringFormat(self, extension: str) -> str:
+        """Create a string representative of a specific sudoku puzzle file format. The
+        possible extension values are sdk, sdx, sdm, ss."""
+
+        if extension == 'sdk':
+            rows = (''.join(str(cell.value) for cell in cellRow) for cellRow in self._cells)
+            return '\n'.join(rows).replace('0', '.')
+        elif extension == 'sdx':
+            # todo: this can't infer if any values a user set as of now
+            allCandidates = tuple(str(i) for i in range(1, 10))
+
+            rows = []
+            for cellRow in self._cells:
+                rowStrings = []
+                for cell in cellRow:
+                    if cell.value:
+                        cellString = str(cell.value)
+                    else:
+                        candidateString = sorted(itertools.compress(allCandidates, cell.candidates))
+                        cellString = ''.join(candidateString)
+                    rowStrings.append(cellString)
+                rows.append(' '.join(rowStrings))
+
+            return '\n'.join(rows)
+        elif extension == 'sdm':
+            return self.__repr__()
+        elif extension == 'ss':
+            skimmedVersion = self.convertToStringFormat('sdk').splitlines(keepends=True)
+            # todo: use some text buffer to build this first
+            sdmString = ''
+            for rowNumber, row in enumerate(skimmedVersion, 1):
+                for columnNumber, value in enumerate(row, 1):
+                    sdmString += value
+                    if columnNumber == 3 or columnNumber == 6:
+                        sdmString += '|'
+                if rowNumber == 3 or rowNumber == 6:
+                    sdmString += '-----------\n'
+            return sdmString
+        else:
+            raise ValueError(f'Invalid extension type {extension}')
+
+    def export(self, filename: str) -> None:
+        """Export the current board state to filename using the corresponding format
+        based on the file extension provided. Possible values are the same for
+        Board.convertToStringFormat()."""
+
+        fileParts = filename.rsplit('.', 1)
+        if len(fileParts) < 2:
+            raise ValueError(f'File path does not have an extension: {filename}')
+
+        extension = fileParts[-1]
+        boardString = self.convertToStringFormat(extension)
+
+        with open(filename, 'w') as file:
+            file.write(boardString)
