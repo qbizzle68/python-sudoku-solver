@@ -39,6 +39,9 @@ class MoveType(IntEnum):
     HIDDEN_PAIR = 12
     HIDDEN_TRIPLE = 13
     HIDDEN_QUAD = 14
+    XWING = 15
+    SWORDFISH = 16
+    JELLYFISH = 17
 
 
 _MOVE_MESSAGES = [
@@ -59,6 +62,9 @@ _MOVE_MESSAGES = [
     'Hidden pair; candidates = {{{candidates}}}; cells = {{{cells}}}',
     'Hidden triple; candidates = {{{candidates}}}; cells = {{{cells}}}',
     'Hidden quad; candidates = {{{candidates}}}; cells = {{{cells}}}',
+    'X-Wing; candidate = {candidate}; row = {{{rows}}}; columns = {{{columns}}}',
+    'Swordfish; candidate = {candidate}; row = {{{rows}}}; columns = {{{columns}}}',
+    'Jellyfish; candidate = {candidate}; row = {{{rows}}}; columns = {{{columns}}}',
 ]
 
 

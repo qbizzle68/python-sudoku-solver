@@ -1,7 +1,7 @@
 import itertools
 import os
 import sys
-from typing import Generator
+from typing import Generator, Union
 
 from board import *
 from containers import *
@@ -38,6 +38,17 @@ _HIDDEN_TUPLE_TYPES = [
 ]
 
 
+_ROW_COLUMN_SUBSET_TYPES = [
+    None, None,
+    MoveType.XWING,
+    MoveType.SWORDFISH,
+    MoveType.JELLYFISH
+]
+
+
+SearchResult = Union[Move | list[Move] | None]
+
+
 class SudokuSolver:
     """The SudokuSolver class handles finding all steps for solving the Sudoku puzzle. The
     SudokuSolver.solve() method lets the solver handle solving the puzzle to completion, or
@@ -57,6 +68,7 @@ class SudokuSolver:
             self.findLockedCandidatesType2,
             self.findNakedDisjointSets,
             self.findHiddenDisjointSets,
+            self.findRowColumnSubsets,
         )
 
     def __str__(self) -> str:
@@ -417,6 +429,70 @@ class SudokuSolver:
 
         return None if single else moves
 
+    def _findLineSubsetsExec(self, houses: GenericIterable[House], candidate: int) -> Generator[Move, None, None]:
+        """Find row and column subsets from houses. The house type in houses is the direction
+        which constrain the subsets. The opposite direction is the direction we are looking to
+        remove candidates. This latter direction is notes by variable names with 'exclude' in
+        them."""
+
+        unfinishedHouses = [house for house in houses if not house.finished]
+        searchHouseType = houses[0].type
+        excludeHouseType = 'row' if searchHouseType == 'column' else 'column'
+        excludeHouses = self._board.rows if excludeHouseType == 'row' else self._board.columns
+
+        for size in range(2, 5):
+            for combination in itertools.combinations(unfinishedHouses, size):
+                cells = [cell for cell in itertools.chain.from_iterable(combination) if cell[candidate]]
+                uniqueExcludeNumbers = sorted(set(getattr(cell.coordinate, excludeHouseType) for cell in cells))
+                if len(uniqueExcludeNumbers) != size:
+                    continue
+
+                combinationNumbers = sorted(set(getattr(cell.coordinate, searchHouseType) for cell in cells))
+                if len(combinationNumbers) != size:
+                    continue
+
+                def isValidCell(cell: Cell) -> bool:
+                    skipHouse = getattr(cell.coordinate, searchHouseType) not in combinationNumbers
+                    return cell[candidate] and skipHouse
+
+                matchedExcludeHouses = [house for house in excludeHouses if house.number in uniqueExcludeNumbers]
+                validCells = [cell for cell in itertools.chain.from_iterable(matchedExcludeHouses) if isValidCell(cell)]
+                if not validCells:
+                    continue
+
+                actions = [Action(ActionType.REMOVE_CANDIDATE, cell, candidate) for cell in validCells]
+                moveType = _ROW_COLUMN_SUBSET_TYPES[size]
+                searchNumbers = tuple(str(number) for number in combinationNumbers)
+                excludeNumbers = tuple(str(number) for number in uniqueExcludeNumbers)
+                rows = ', '.join(searchNumbers) if searchHouseType == 'row' else ', '.join(excludeNumbers)
+                columns = ', '.join(searchNumbers) if searchHouseType == 'column' else ', '.join(excludeNumbers)
+                message = getMoveMessage(moveType, candidate=candidate, rows=rows, columns=columns)
+
+                yield Move(moveType, actions, message)
+
+    def findRowColumnSubsets(self, single: bool = True) -> SearchResult:
+        """Find row/column subsets in the puzzle. Return a Move object is single is True and
+        a move exists, otherwise return None. If single is False return a list of moves (if
+        any exist)."""
+
+        candidateSelectors = (not all(i in row for row in self._board.rows) for i in range(1, 10))
+        availableCandidates = itertools.compress(range(1, 10), candidateSelectors)
+
+        moves = []
+        for candidate in availableCandidates:
+            rowAndColumnSubsets = itertools.chain(
+                self._findLineSubsetsExec(self._board.rows, candidate),
+                self._findLineSubsetsExec(self._board.columns, candidate)
+            )
+
+            for move in rowAndColumnSubsets:
+                if single:
+                    return move
+                else:
+                    moves.append(move)
+
+        return None if single else moves
+
     @property
     def board(self) -> Board:
         return self._board
@@ -444,7 +520,7 @@ def main():
     # this will be handled by argparse in the future
     if len(sys.argv) > 2:
         detailsArg = sys.argv[2]
-        if detailsArg == '--details' or detailsArg == '-d':
+        if detailsArg == '--detail' or detailsArg == '-d':
             details = True
         else:
             print('Unknown argument', detailsArg)

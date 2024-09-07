@@ -387,6 +387,15 @@ class Board:
 
         return Move(_type, [action] + secondaryActions, msg)
 
+    def setCell(self, coordinate: Coordinate, value: int) -> None:
+        """Create a Move object to set coordinate to value similar to what is returned
+        from Board.setCellMove() and execute the move. This doesn't return anything and
+        is simple an ease of use function for also adjusting candidates when setting a
+        cell value."""
+
+        move = self.setCellMove(MoveType.GENERAL, coordinate, value, '')
+        move()
+
     @staticmethod
     def removeCandidateValues(cells: GenericIterable[Cell], value: int, key: callable) -> list[Action]:
         """Builds a Move object from all actions needed to remove the candidate value from
