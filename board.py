@@ -5,122 +5,7 @@ from cell import Coordinate, Cell
 from containers import GenericIterable, CellContainer, House
 from move import Move, Action, ActionType, MoveType
 
-__all__ = ('dataArrayFromSS', 'dataArrayFromSDK', 'dataArrayFromSDX', 'dataArrayFromSDM', 'allEqual', 'Board')
-
-
-def dataArrayFromSS(rawData: str) -> list[list[int]]:
-    """Convert a raw string from a .ss file to a data array. Each line is a row
-    represented by the column values with a period (.) representing unfilled cells.
-    Every third column is separated by a pipe symbol (|) and every third row is
-    separated by a row of hyphens (-).
-
-    Example:
-        ..7|..5|..3
-        ..9|.6.|...
-        36.|..8|2..
-        -----------
-        ..6|...|...
-        51.|.8.|..9
-        ...|..2|.4.
-        -----------
-        ...|5..|9..
-        83.|.1.|..5
-        7..|...|...
-    """
-
-    array = []
-    dataRows = rawData.splitlines(keepends=False)
-    for line in dataRows:
-        if line.startswith('-'):
-            continue
-        processedLine = line.replace('.', '0').replace('|', '').rstrip()
-        row = [int(char) for char in processedLine]
-        array.append(row)
-
-    return array
-
-
-def dataArrayFromSDK(rawData: str) -> list[list[int]]:
-    """Convert a raw data string representing a .sdk file to an integer data array.
-    The first several lines may provide comments by starting the line with a '#'
-    character. The puzzle is represented by rows of column values with periods (.)
-    representing unfilled cells.
-
-    Example:
-        #ARuud
-        #DA random puzzle created by SudoCue
-        #CJust start plugging in the numbers
-        #B03-08-2006
-        #SSudoCue
-        #LEasy
-        #Uhttp://www.sudocue.net/
-        2..1.5..3
-        .54...71.
-        .1.2.3.8.
-        6.28.73.4
-        .........
-        1.53.98.6
-        .2.7.1.6.
-        .81...24.
-        7..4.2..1
-    """
-
-    array = []
-    dataRows = rawData.splitlines(keepends=False)
-    for line in dataRows:
-        if line.startswith('#'):
-            continue
-
-        processedLine = line.replace('.', '0')
-        row = [int(char) for char in processedLine]
-        array.append(row)
-
-    return array
-
-
-def dataArrayFromSDX(rawData: str) -> list[list[int]]:
-    """Convert a raw data string representing a .sdx file to an integer data array.
-    Each line contains groups of numbers separated by spaces where unfilled cells
-    are seen as groups of candidates for the cell. A 'u' character can prefix a set
-    cell to signal that it was set by a user.
-
-    Example:
-        2 679 6789 1 46789 5 469 9 3
-        389 5 4 69 689 68 7 1 29
-        9 1 679 2 4679 3 4569 8 59
-        6 9 2 8 u1 7 3 59 4
-        3489 3479 3789 56 2456 46 u1 2579 2579
-        1 47 5 3 24 9 8 27 6
-        3459 2 39 7 3589 1 59 6 589
-        359 8 1 569 3569 6 2 4 579
-        7 369 369 4 35689 2 59 359 1
-    """
-
-    array = []
-    dataRows = rawData.splitlines(keepends=False)
-    for line in dataRows:
-        groups = line.split(' ')
-        row = []
-        for group in groups:
-            group = group.replace('u', '')
-            value = int(group) if len(group) == 1 else 0
-            row.append(value)
-        array.append(row)
-
-    return array
-
-
-def dataArrayFromSDM(rawData: str) -> list[list[int]]:
-    """Convert a raw data string representing a line from a .sdm file to an integer
-    data array. Each line is a run-on list of values from each row with a zero (0)
-    representing an unfilled cell. Other characters (such as a period (.)) are also
-    valid representations of empty cells.
-
-    Example:
-        016400000200009000400000062070230100100000003003087040960000005000800007000006820
-    """
-
-    return [[int(rawData[row * 9 + column]) for column in range(9)] for row in range(9)]
+__all__ = ('allEqual', 'Board')
 
 
 def allEqual(_list: Iterable) -> int:
@@ -132,7 +17,7 @@ def allEqual(_list: Iterable) -> int:
 
 
 class Board:
-    __slots__ = '_cells', '_rows', '_columns', '_boxes'  # , '_order'
+    __slots__ = '_cells', '_rows', '_columns', '_boxes'
 
     def __init__(self, array: list[list[int]]):
         """Instantiate the Board with initial values in array as rows of columns. Any
@@ -185,6 +70,59 @@ class Board:
                             number in self._boxes[sectionNumber]:
                         self._cells[row][column][number] = False
 
+    @staticmethod
+    def _fromSDKFormat(board: 'Board', data: list[str]) -> 'Board':
+        array = []
+        for line in data:
+            if line.startswith('#'):
+                continue
+
+            processedLine = line.replace('.', '0')
+            row = [int(char) for char in processedLine]
+            array.append(row)
+
+        board.__init__(array)
+        return board
+
+    @staticmethod
+    def _fromSDXFormat(board: 'Board', data: list[str]) -> 'Board':
+        lines = [[group.replace('u', '') for group in line.split(' ')] for line in data]
+        array = [[int(group) if len(group) == 1 else 0 for group in line] for line in lines]
+        board.__init__(array)
+
+        squashedGroups = itertools.chain.from_iterable(lines)
+        for cell, group in zip(board._cells.squash(), squashedGroups):
+            if len(group) == 1:
+                continue
+
+            candidates = [int(char) for char in group]
+            exclude = itertools.filterfalse(lambda o: o in candidates, range(1, 10))
+            for candidate in exclude:
+                cell[candidate] = False
+
+        return board
+
+    @staticmethod
+    def _fromSDMFormat(board: 'Board', data: str) -> 'Board':
+        array = [[int(data[row * 9 + column]) for column in range(9)] for row in range(9)]
+
+        board.__init__(array)
+        return board
+
+    @staticmethod
+    def _fromSSFormat(board: 'Board', data: list[str]) -> 'Board':
+        array = []
+        for line in data:
+            if line.startswith('-'):
+                continue
+
+            processedLine = line.replace('.', '0').replace('|', '').rstrip()
+            row = [int(char) for char in processedLine]
+            array.append(row)
+
+        board.__init__(array)
+        return board
+
     @classmethod
     def fromFile(cls, filename: str) -> 'Board':
         """Read contents of a file and convert the data to a Board object. The file must
@@ -198,27 +136,28 @@ class Board:
         if not data:
             raise IOError(f'Error reading from {filename}.')
 
+        board = object.__new__(cls)
         if filename.endswith('.sdk'):
-            array = dataArrayFromSDK(data)
+            dataRows = data.splitlines(keepends=False)
+            board = cls._fromSDKFormat(board, dataRows)
         elif filename.endswith('.sdx'):
-            array = dataArrayFromSDX(data)
+            dataRows = data.splitlines(keepends=False)
+            board = cls._fromSDXFormat(board, dataRows)
         elif filename.endswith('.sdm'):
             # we only take the first line if there are many
             firstLine = data.split('\n', 1)[0]
-            array = dataArrayFromSDM(firstLine)
+            board = cls._fromSDMFormat(board, firstLine)
         elif filename.endswith('.ss'):
-            array = dataArrayFromSS(data)
+            dataRows = data.splitlines(keepends=False)
+            board = cls._fromSSFormat(board, dataRows)
         else:
             raise ValueError(f'Unknown Sudoku file format ({filename}).')
-
-        board = object.__new__(cls)
-        board.__init__(array)
 
         return board
 
     @classmethod
     def fromCollection(cls, filename: str, number: int) -> 'Board':
-        """Read the nth puzzle from a list of puzzles with a .ss file format at
+        """Read the nth puzzle from a list of puzzles with a .sdm file format at
         filename. If there are less than number of puzzles ValueError is raised."""
 
         with open(filename, 'r') as file:
@@ -230,11 +169,13 @@ class Board:
         if len(data) < number:
             raise ValueError(f'Only {len(data)} puzzles found in {filename}, can\'t access puzzle {number}')
 
-        array = dataArrayFromSDM(data[number - 1].rstrip())
+        # array = dataArrayFromSDM(data[number - 1].rstrip())
         board = object.__new__(cls)
-        board.__init__(array)
+        # board.__init__(array)
+        line = data[number - 1].rstrip()
+        return cls._fromSDMFormat(board, line)
 
-        return board
+        # return board
 
     @property
     def cells(self) -> GenericIterable[GenericIterable[Cell]]:
