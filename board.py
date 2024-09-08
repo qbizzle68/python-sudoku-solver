@@ -288,6 +288,15 @@ class Board:
         """Return the Cell whose coordinates match those in coordinate."""
         return self._cells[coordinate.row][coordinate.column]
 
+    @staticmethod
+    def isPeer(cell: Cell, other: Cell) -> bool:
+        """Returns True if cell and other are peers, otherwise returns False."""
+
+        cellCoordinate = cell.coordinate
+        otherCoordinate = other.coordinate
+        return (cellCoordinate.row == otherCoordinate.row or cellCoordinate.column == otherCoordinate.column
+                or cellCoordinate.box == otherCoordinate.box)
+
     def getPeerCells(self, cells: Cell | list[Cell]) -> GenericIterable[Cell]:
         """Return the common peer cells of every cell in cells. If cell can be a single Cell
         object or a list of Cell objects."""
@@ -295,17 +304,8 @@ class Board:
         if isinstance(cells, Cell):
             cells = [cells]
 
-        boxNumber = allEqual(cell.coordinate.box for cell in cells)
-        rowNumber = allEqual(cell.coordinate.row for cell in cells)
-        columnNumber = allEqual(cell.coordinate.column for cell in cells)
-
-        def key(cell: Cell) -> bool:
-            return cell.coordinate.box == boxNumber or cell.coordinate.row == rowNumber \
-                   or cell.coordinate.column == columnNumber
-
-        peerCells = [cell for cell in self._cells.squash() if key(cell) and cell not in cells]
-
-        return GenericIterable(peerCells)
+        return GenericIterable(cell for cell in self._cells.squash()
+                               if cell not in cells and all(self.isPeer(cell, other) for other in cells))
 
     def setCellMove(self, _type: MoveType, coordinate: Coordinate, value: int, msg: str) -> Move:
         """Compiles all Action objects associated with setting the cell at row and column
