@@ -26,7 +26,7 @@ class Board:
         self._cells = self._convertDataToCells(array)
         self._setHouses()
         self._setInitialCandidates()
-        
+
     @staticmethod
     def _convertDataToCells(array: list[list[int]]) -> CellContainer:
         """Convert a 2D array of integers into an array of Cell objects."""
@@ -169,13 +169,9 @@ class Board:
         if len(data) < number:
             raise ValueError(f'Only {len(data)} puzzles found in {filename}, can\'t access puzzle {number}')
 
-        # array = dataArrayFromSDM(data[number - 1].rstrip())
         board = object.__new__(cls)
-        # board.__init__(array)
         line = data[number - 1].rstrip()
         return cls._fromSDMFormat(board, line)
-
-        # return board
 
     @property
     def cells(self) -> GenericIterable[GenericIterable[Cell]]:
